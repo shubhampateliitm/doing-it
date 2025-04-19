@@ -1,0 +1,82 @@
+version: '3.8'
+
+networks:
+  scrape_network:
+    driver: bridge
+
+services:
+  scrape_sentiment:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./run/code/python_project/scrape_sentiments:/app/scrape_sentiments
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: sleep infinity
+    networks:
+      - scrape_network
+
+  git-sync:
+    image: k8s.gcr.io/git-sync/git-sync:v3.6.6
+    volumes:
+      - ./run:/git
+    environment:
+      - GIT_SYNC_REPO=https://github.com/shubhampateliitm/scrap-with-dock.git
+      - GIT_SYNC_BRANCH=main
+      - GIT_SYNC_ROOT=/git
+      - GIT_SYNC_WAIT=30
+      - GIT_SYNC_ONE_TIME=false
+    networks:
+      - scrape_network
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - ./run/postgres_data:/var/lib/postgresql/data
+    networks:
+      - scrape_network
+
+  airflow-webserver:
+    build:
+      context: ./deployment/airflow
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./run/code/airflow/dags:/opt/airflow/dags
+    depends_on:
+      - postgres
+      - git-sync
+    networks:
+      - scrape_network
+
+  airflow-scheduler:
+    build:
+      context: ./deployment/airflow
+      dockerfile: Dockerfile
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./run/code/airflow/dags:/opt/airflow/dags
+    depends_on:
+      - postgres
+      - git-sync
+    networks:
+      - scrape_network
+
+volumes:
+  postgres_data:
