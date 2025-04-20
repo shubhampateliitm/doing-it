@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 import requests
-from airflow.providers.ssh.operators.ssh import SSHOperator
+from airflow.operators.bash import BashOperator
 
 # Default arguments for the DAG
 default_args = {
@@ -52,10 +52,9 @@ scrape_task = PythonOperator(
 )
 
 # Define the SSHOperator task to execute a command in the scrape_sentiment container
-exec_command_task = SSHOperator(
+exec_command_task = BashOperator(
     task_id='exec_command_in_scrape_sentiment',
-    ssh_conn_id='docker_ssh',
-    command='docker exec scrape_sentiment python main.py --date "{{ ds }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"',
+    bash_command='docker exec scrape_sentiment python main.py --date "{{ ds }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"',
     dag=dag,
 )
 

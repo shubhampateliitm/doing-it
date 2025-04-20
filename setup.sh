@@ -7,16 +7,16 @@ set -e
 AIRFLOW_HOME="./run/doing-it.git/code/airflow"
 DAGS_DIR="./run/doing-it.git/code/airflow/dags"
 
-# Step 1: Create necessary directories
-if [ ! -d "$AIRFLOW_HOME" ]; then
-  echo "Creating Airflow home directory..."
-  mkdir -p "$AIRFLOW_HOME"
-fi
+# # Step 1: Create necessary directories
+# if [ ! -d "$AIRFLOW_HOME" ]; then
+#   echo "Creating Airflow home directory..."
+#   mkdir -p "$AIRFLOW_HOME"
+# fi
 
-if [ ! -d "$DAGS_DIR" ]; then
-  echo "Creating DAGs directory..."
-  mkdir -p "$DAGS_DIR"
-fi
+# if [ ! -d "$DAGS_DIR" ]; then
+#   echo "Creating DAGs directory..."
+#   mkdir -p "$DAGS_DIR"
+# fi
 
 # Step 2: Initialize Airflow database
 echo "Initializing Airflow database..."
