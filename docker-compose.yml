@@ -17,6 +17,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     command: sleep infinity
+    container_name: p1_scrape_sentiment
     networks:
       - scrape_network
     depends_on:
@@ -61,7 +62,6 @@ services:
       - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
     depends_on:
       - postgres
-      - git-sync
     networks:
       - scrape_network
     command: airflow webserver

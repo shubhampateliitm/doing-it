@@ -42,19 +42,10 @@ dag = DAG(
 def scrape_info():
     print("Scraping information...")
 
-# Define the task with SLA and failure callback
-scrape_task = PythonOperator(
-    task_id='scrape_task',
-    python_callable=scrape_info,
-    dag=dag,
-    sla=timedelta(minutes=10),
-    on_failure_callback=task_failure_alert,
-)
-
 # Define the SSHOperator task to execute a command in the scrape_sentiment container
 exec_command_task = BashOperator(
     task_id='exec_command_in_scrape_sentiment',
-    bash_command='docker exec scrape_sentiment python main.py --date "{{ ds }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"',
+    bash_command='docker exec p1_scrape_sentiment python main.py --date "{{ ds }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"',
     dag=dag,
 )
 
