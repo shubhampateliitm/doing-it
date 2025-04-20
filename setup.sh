@@ -4,8 +4,8 @@
 set -e
 
 # Define constants
-AIRFLOW_HOME="./run/code/airflow"
-DAGS_DIR="./run/code/airflow/dags"
+AIRFLOW_HOME="./run/doing-it.git/code/airflow"
+DAGS_DIR="./run/doing-it.git/code/airflow/dags"
 
 # Step 1: Create necessary directories
 if [ ! -d "$AIRFLOW_HOME" ]; then

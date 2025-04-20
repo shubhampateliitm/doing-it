@@ -10,7 +10,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./run/code/python_project/scrape_sentiments:/app/scrape_sentiments
+      - ./run/doing-it.git/code/python_project/scrape_sentiments:/app/scrape_sentiments
       - ./data:/app/data
     ports:
       - "8000:8000"
@@ -19,19 +19,22 @@ services:
     command: sleep infinity
     networks:
       - scrape_network
+    depends_on:
+      - git-sync
 
   git-sync:
     image: k8s.gcr.io/git-sync/git-sync:v3.6.6
     volumes:
-      - ./run:/git
+      - ./run/:/git
     environment:
-      - GIT_SYNC_REPO=https://github.com/shubhampateliitm/scrap-with-dock.git
+      - GIT_SYNC_REPO=https://github.com/shubhampateliitm/doing-it.git
       - GIT_SYNC_BRANCH=main
       - GIT_SYNC_ROOT=/git
       - GIT_SYNC_WAIT=30
       - GIT_SYNC_ONE_TIME=false
     networks:
       - scrape_network
+    
 
   postgres:
     image: postgres:15
@@ -55,12 +58,13 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
-      - ./run/code/airflow/dags:/opt/airflow/dags
+      - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
     depends_on:
       - postgres
       - git-sync
     networks:
       - scrape_network
+    command: airflow webserver
 
   airflow-scheduler:
     build:
@@ -71,10 +75,11 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
-      - ./run/code/airflow/dags:/opt/airflow/dags
+      - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
     depends_on:
       - postgres
       - git-sync
+    command: airflow scheduler
     networks:
       - scrape_network
 
