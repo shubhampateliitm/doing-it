@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.firefox.options import Options
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from datetime import datetime
@@ -16,6 +17,7 @@ import time
 import random
 from retrying import retry
 import logging
+import traceback
 
 # Configure logging
 log_level = logging.INFO  # Default log level
@@ -35,27 +37,20 @@ class BaseScraper(ABC):
     def setup_driver(self):
         """Set up the Selenium WebDriver with options. If Chrome is not available, attempt to set it up."""
         try:
-            options = webdriver.ChromeOptions()
+            options = Options()
             options.add_argument(SELENIUM_OPTIONS["headless"])
             options.add_argument(SELENIUM_OPTIONS["disable_gpu"])
             options.add_argument(SELENIUM_OPTIONS["window_size"])
             options.add_argument(SELENIUM_OPTIONS["lang"])
             options.add_argument(SELENIUM_OPTIONS["disable_blink_features"])
             options.add_argument(SELENIUM_OPTIONS["user_agent"])
-            self.driver = webdriver.Chrome(options=options)
+            self.driver = webdriver.Remote(
+                    command_executor='http://firefox:4444/wd/hub',
+                    options=options
+            )
         except Exception as e:
             logging.error("Chrome WebDriver setup failed: %s", str(e))
             logging.info("Attempting to set up Chrome WebDriver.")
-            from selenium.webdriver.chrome.service import Service
-            from webdriver_manager.chrome import ChromeDriverManager
-            options = webdriver.ChromeOptions()
-            options.add_argument(SELENIUM_OPTIONS["headless"])
-            options.add_argument(SELENIUM_OPTIONS["disable_gpu"])
-            options.add_argument(SELENIUM_OPTIONS["window_size"])
-            options.add_argument(SELENIUM_OPTIONS["lang"])
-            options.add_argument(SELENIUM_OPTIONS["disable_blink_features"])
-            options.add_argument(SELENIUM_OPTIONS["user_agent"])
-            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     def close_driver(self):
         """Close the Selenium WebDriver."""
@@ -77,9 +72,10 @@ class YourStoryScraper(BaseScraper):
     @retry(stop_max_attempt_number=3, wait_random_min=1000, wait_random_max=3000)
     def fetch_article_urls(self, page_source, target_date):
         logging.info("Fetching article URLs for target date: %s", target_date)
-        time.sleep(random.uniform(1, 3))  # Random delay to avoid bot detection
+        time.sleep(random.uniform(1, 3))
         soup = BeautifulSoup(page_source, "html.parser")
         story_div = soup.find("div", class_="storyItem")
+
         if not story_div:
             logging.warning("No story items found on the page.")
             return []
@@ -100,11 +96,10 @@ class YourStoryScraper(BaseScraper):
 
         logging.info("Fetched %d article URLs for target date: %s", len(final_urls_with_dates), target_date)
 
-        # Filter URLs by the target date
         target_date_obj = datetime.strptime(target_date, "%Y-%m-%d")
         filtered_urls_with_dates = [
             (date, url) for (date, url) in final_urls_with_dates
-            if datetime.strptime(date, "%d/%m/%Y") == target_date_obj
+            if datetime.strptime(date, "%m/%d/%Y") == target_date_obj
         ]
 
         if not filtered_urls_with_dates:
@@ -167,7 +162,6 @@ class YourStoryScraper(BaseScraper):
                 "tagline": tagline,
                 "sentiment_score": sentiment_score,
             })
-
         # Convert results to a pandas DataFrame
         return pd.DataFrame(results)
 
@@ -198,12 +192,13 @@ class YourStoryScraper(BaseScraper):
                 all_results.append(results)
         except TimeoutException:
             logging.error("Timeout while waiting for the page to load.")
+            logging.error("Stack trace:")
+            logging.error(traceback.format_exc())
         except Exception as e:
             logging.error("An error occurred during scraping: %s", str(e))
-        finally:
-            self.close_driver()
-            logging.info("WebDriver closed.")
-
+            logging.error("Stack trace:")
+            logging.error(traceback.format_exc())
+            
         # Combine all results into a single DataFrame
         if all_results:
             logging.info("Combining all scraped results into a single DataFrame.")

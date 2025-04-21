@@ -7,10 +7,10 @@ networks:
 services:
   scrape_sentiment:
     build:
-      context: .
+      context: ./deployment/python/
       dockerfile: Dockerfile
     volumes:
-      - ./run/doing-it.git/code/python_project/scrape_sentiments:/app/scrape_sentiments
+      - ./code/python_project/scrape_sentiments:/app/scrape_sentiments
       - ./data:/app/data
     ports:
       - "8000:8000"
@@ -22,6 +22,7 @@ services:
       - scrape_network
     depends_on:
       - git-sync
+      - firefox
 
   git-sync:
     image: k8s.gcr.io/git-sync/git-sync:v3.6.6
@@ -82,6 +83,16 @@ services:
     command: airflow scheduler
     networks:
       - scrape_network
+
+  firefox:
+    image: selenium/standalone-firefox
+    ports:
+      - "4444:4444"
+    networks:
+      scrape_network:
+        aliases:
+          - firefox
+    shm_size: 2g
 
 volumes:
   postgres_data:

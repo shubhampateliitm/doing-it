@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
 import requests
 from airflow.operators.bash import BashOperator
 
@@ -46,6 +45,11 @@ def scrape_info():
 exec_command_task = BashOperator(
     task_id='exec_command_in_scrape_sentiment',
     bash_command='docker exec p1_scrape_sentiment python main.py --date "{{ ds }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"',
+    retries=5,
+    retry_delay=timedelta(minutes=10),
+    sla=timedelta(minutes=30),  # Example SLA of 30 minutes
+    on_failure_callback=task_failure_alert,
+    on_success_callback=None,
     dag=dag,
 )
 

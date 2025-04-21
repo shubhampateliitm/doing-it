@@ -8,6 +8,7 @@ import logging
 import argparse
 import os
 from pathlib import Path
+import traceback
 
 # Add the project root directory to the Python path
 project_root = Path(__file__).resolve().parent.parent
@@ -98,7 +99,7 @@ def scrape_and_store(date, delta_table_path, website_to_scrape, search_terms):
         .appName("DeltaLakeOperations") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-        .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.2.0") \
         .getOrCreate()
 
     try:
@@ -107,28 +108,16 @@ def scrape_and_store(date, delta_table_path, website_to_scrape, search_terms):
             scraper = YourStoryScraper(date, search_terms)
         elif website_to_scrape == "finshots":
             scraper = FinshotsScraper(date, search_terms)
-
         if not scraper:
             raise ValueError(f"Unsupported website: {website_to_scrape}")
-
-        scraped_data = scraper.scrape()
-
-        if not scraped_data:
-            logging.warning(f"No articles found for the given date: {date}")
-            return
-
-        df = pd.DataFrame(scraped_data)
-
-        df["unique_key"] = df["url"].str.strip().str.lower() + date
-        df["scraping_timestamp"] = pd.Timestamp.now()
-
-        new_data_arrow = pa.Table.from_pandas(df)
-
-        write_to_delta_table(delta_table_path, new_data_arrow, spark)
-
-        # Call vacuum operation after writing data
-        vacuum_delta_table(delta_table_path, spark)
-
+        df = scraper.scrape()
+        if not df.empty:
+            df["unique_key"] = df["url"].str.strip().str.lower() + date
+            df["scraping_timestamp"] = pd.Timestamp.now()
+            df["website"] = website_to_scrape
+            new_data_arrow = pa.Table.from_pandas(df)
+            write_to_delta_table(delta_table_path, new_data_arrow, spark)
+            vacuum_delta_table(delta_table_path, spark)        
     except Exception as e:
         logging.error(f"An error occurred during scraping or storing: {e}")
     finally:
@@ -157,4 +146,6 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+        logging.error("Stack trace:")
+        logging.error(traceback.format_exc())
         sys.exit(1)
