@@ -112,7 +112,7 @@ def scrape_and_store(date, delta_table_path, website_to_scrape, search_terms):
             raise ValueError(f"Unsupported website: {website_to_scrape}")
         df = scraper.scrape()
         if not df.empty:
-            df["unique_key"] = df["url"].str.strip().str.lower() + date
+            df["unique_key"] = df["url"].str.strip().str.lower() + "_$_" + date
             df["scraping_timestamp"] = pd.Timestamp.now()
             df["website"] = website_to_scrape
             new_data_arrow = pa.Table.from_pandas(df)

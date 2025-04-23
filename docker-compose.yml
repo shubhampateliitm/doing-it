@@ -14,12 +14,15 @@ services:
       - ./data:/app/data
     ports:
       - "8000:8000"
+      - "22:22"
     environment:
       - PYTHONUNBUFFERED=1
-    command: sleep infinity
+    command: /usr/sbin/sshd -D
     container_name: p1_scrape_sentiment
     networks:
-      - scrape_network
+      scrape_network:
+        aliases:
+          - spark_container
     depends_on:
       - git-sync
       - firefox
@@ -36,7 +39,6 @@ services:
       - GIT_SYNC_ONE_TIME=false
     networks:
       - scrape_network
-    
 
   postgres:
     image: postgres:15
@@ -60,7 +62,8 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
-      - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
+      - ./run/doing-it.git/code/airflow:/opt/airflow
+      - ./airflow/.ssh:/home/airflow/.ssh:ro
     depends_on:
       - postgres
     networks:
@@ -76,7 +79,8 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
-      - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
+      - ./run/doing-it.git/code/airflow:/opt/airflow
+      - ./airflow/.ssh:/home/airflow/.ssh:ro
     depends_on:
       - postgres
       - git-sync

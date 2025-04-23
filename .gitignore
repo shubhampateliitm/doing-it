@@ -5,3 +5,7 @@ code/python_project/scrape_sentiments/__pycache_
 *.pyc
 __pycache__
 *__pycache__*
+deployment/python/spark/.ssh
+airflow
+deployment/python/.bashrc
+spark

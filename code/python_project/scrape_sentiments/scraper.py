@@ -8,6 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from datetime import datetime
@@ -18,6 +19,8 @@ import random
 from retrying import retry
 import logging
 import traceback
+
+from .sentiment_analysis import analyze_sentiment
 
 # Configure logging
 log_level = logging.INFO  # Default log level
@@ -49,8 +52,8 @@ class BaseScraper(ABC):
                     options=options
             )
         except Exception as e:
-            logging.error("Chrome WebDriver setup failed: %s", str(e))
-            logging.info("Attempting to set up Chrome WebDriver.")
+            logging.error("Firefox WebDriver setup failed: %s", str(e))
+            logging.info("Attempting to set up Firefox WebDriver.")
 
     def close_driver(self):
         """Close the Selenium WebDriver."""
@@ -99,7 +102,7 @@ class YourStoryScraper(BaseScraper):
         target_date_obj = datetime.strptime(target_date, "%Y-%m-%d")
         filtered_urls_with_dates = [
             (date, url) for (date, url) in final_urls_with_dates
-            if datetime.strptime(date, "%m/%d/%Y") == target_date_obj
+            if datetime.strptime(date, "%m/%d/%Y") >= target_date_obj
         ]
 
         if not filtered_urls_with_dates:
@@ -143,17 +146,11 @@ class YourStoryScraper(BaseScraper):
 
     def get_scraped_results(self, article_urls):
         """Fetch and return scraped results for a list of article URLs as a pandas DataFrame, including sentiment scores."""
-        from .sentiment_analysis import analyze_sentiment
 
         results = []
         for article_date, article_url in article_urls:
-            # Fetch article content
             article, header, tagline = self.fetch_article_content(article_url)
-
-            # Analyze sentiment
             sentiment_score = analyze_sentiment(article)
-
-            # Append result
             results.append({
                 "date": article_date,
                 "url": article_url,
@@ -212,8 +209,131 @@ class FinshotsScraper(BaseScraper):
 
     def __init__(self, date, search_terms):
         super().__init__(date, search_terms)
+        self.base_url = "https://finshots.in"
 
     def scrape(self):
-        """Scrape data from Finshots."""
-        # Add logic to scrape data from Finshots
-        print(f"Scraping Finshots for date: {self.date}")
+        results = []
+        for search_term in self.search_terms:
+            try:
+                self.setup_driver()
+                self.driver.get(self.base_url)
+                self.search_for_keyword(search_term)
+                time.sleep(random.uniform(5, 8))
+                results.append(self.walk_through_search_results(self.date, search_term))
+            except TimeoutException:
+                logging.error("Timeout while waiting for the page to load.")
+                logging.error("Stack trace:")
+                logging.error(traceback.format_exc())
+            except Exception as e:
+                logging.error("An error occurred during scraping: %s", str(e))
+                logging.error("Stack trace:")
+                logging.error(traceback.format_exc())
+            finally:
+                self.close_driver()
+        # Combine all results into a single DataFrame
+        print(results)
+        if results:
+            try:
+                logging.info("Combining all scraped results into a single DataFrame.")
+                return pd.concat(results, ignore_index=True)
+            except Exception as e:
+                logging.error("Error while combining results: %s", str(e))
+                logging.error(traceback.format_exc())
+        else:
+            logging.warning("No results to combine. Returning an empty DataFrame.")
+            return pd.DataFrame()
+
+    def click_on_search_box(self):
+        try:
+            button = self.driver.find_element(By.CSS_SELECTOR, "button.gh-search")
+            self.driver.execute_script("arguments[0].click();", button)
+            time.sleep(random.uniform(5, 8))  # Random sleep to mimic human interaction
+            logging.info("Clicked on the search box successfully.")
+        except NoSuchElementException:
+            logging.error("Search button not found.")
+        except WebDriverException as e:
+            logging.error(f"Error while clicking on the search box: {e}")
+
+    def put_text_in_search_box(self, text):
+        try:
+            iframe = self.driver.find_element(By.CSS_SELECTOR, '#sodo-search-root iframe')
+            self.driver.switch_to.frame(iframe)
+            logging.info("Switched to iframe successfully.")
+            search_input = self.driver.find_element(By.CSS_SELECTOR, 'input[placeholder="Search posts and tags"]')
+            search_input.send_keys(text)
+            logging.info(f"Entered text '{text}' in the search box successfully.")
+        except NoSuchElementException:
+            logging.error("Search input box or iframe not found.")
+        except WebDriverException as e:
+            logging.error(f"Error while interacting with the search box: {e}")
+        finally:
+            self.driver.switch_to.default_content()  # Ensure we switch back to the default content
+
+    def search_for_keyword(self, keyword):
+        try:
+            self.click_on_search_box()
+            self.put_text_in_search_box(keyword)
+            logging.info(f"Search for keyword '{keyword}' completed successfully.")
+        except Exception as e:
+            logging.error(f"An error occurred during the search process: {e}")
+
+    def walk_through_search_results(self,date, keyword):
+        try:
+            iframe = self.driver.find_element(By.CSS_SELECTOR, '#sodo-search-root iframe')
+            self.driver.switch_to.frame(iframe)
+            total_post = len(self.driver.find_elements(By.CSS_SELECTOR, "div.cursor-pointer")[:5])
+            self.driver.switch_to.default_content()
+            results = []
+
+            for i in range(total_post):
+                self.driver.get(self.base_url)
+                time.sleep(random.uniform(5, 8))
+                self.search_for_keyword(keyword)
+                time.sleep(random.uniform(5, 8))
+                iframe = self.driver.find_element(By.CSS_SELECTOR, '#sodo-search-root iframe')
+                self.driver.switch_to.frame(iframe)
+                posts = self.driver.find_elements(By.CSS_SELECTOR, "div.cursor-pointer")[:5]
+                posts[i].click()
+                time.sleep(random.uniform(2, 5)) 
+                result = self.get_article_content()
+                article_date = None
+                if result:
+                    article_date, url, article, title = result
+                    if article_date >= date:
+                        sentiment_score = analyze_sentiment(article)
+                        results.append({
+                        "date": article_date,
+                        "url": url,
+                        "article": article,
+                        "header": title,
+                        "tagline": "",
+                        "sentiment_score": sentiment_score,
+                        })
+                time.sleep(random.uniform(2, 5))
+                if article_date and article_date < date:
+                    break
+                
+        except Exception as e:
+            logging.error(f"Error during walking through search results: {e}")
+            logging.error("Stack trace:")
+            logging.error(traceback.format_exc())
+        finally:
+            self.driver.switch_to.default_content()
+            return pd.DataFrame(results)
+        
+
+    def get_article_content(self):
+        try:
+            url = self.driver.current_url
+            self.driver.get(url)
+            time.sleep(random.uniform(5, 8))  # Random sleep to mimic human interaction
+            logging.info(f"Current URL: {url}")
+            # Wait for the article content to load
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            date = soup.find("time", class_="post-full-meta-date")["datetime"]
+            title = soup.find("h1", class_="article-title").get_text(separator=" ", strip=True)
+            article = soup.find("section", class_="gh-content").get_text(separator=" ", strip=True)
+            print("Extracted article content successfully")
+            return date, url, article, title
+        except Exception as e:
+            logging.error(f"Error while extracting article content: {e}")
