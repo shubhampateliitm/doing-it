@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 import requests
-from airflow.operators.bash import BashOperator
+from airflow.providers.ssh.operators.ssh import SSHOperator
+from airflow.providers.ssh.hooks.ssh import SSHHook
+from airflow.operators.empty import EmptyOperator
 
 # Default arguments for the DAG
 default_args = {
@@ -37,21 +39,37 @@ dag = DAG(
     catchup=False,
 )
 
-# Define the Python function to be executed
-def scrape_info():
-    print("Scraping information...")
+
+start = EmptyOperator(task_id='start', dag=dag)
+end = EmptyOperator(task_id='end', dag=dag)
 
 # Define the SSHOperator task to execute a command in the scrape_sentiment container
-exec_command_task = BashOperator(
-    task_id='exec_command_in_scrape_sentiment',
-    bash_command='docker exec p1_scrape_sentiment python main.py --date "{{ ds }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"',
+scrap_finshots = SSHOperator(
+    task_id='scrape_finshots',
+    command="""bash -c 'python3 /app/scrape_sentiments/main.py --date "{{ macros.ds_add(ds, -3) }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="finshots"' """,
+    ssh_conn_id='ssh_scrape_sentiment',  # Set SSH connection timeout to 1 hour
     retries=5,
     retry_delay=timedelta(minutes=10),
     sla=timedelta(minutes=30),  # Example SLA of 30 minutes
     on_failure_callback=task_failure_alert,
     on_success_callback=None,
+    cmd_timeout = 3600*60,
+    dag=dag,
+)
+
+
+scrap_yourstory = SSHOperator(
+    task_id='scrape_yourstory',
+    command="""bash -c 'python3 /app/scrape_sentiments/main.py --date "{{ macros.ds_add(ds, -3) }}" --delta-table-path="/app/data/sentiment-info" --website-to-scrape="yourstory"' """,
+    ssh_conn_id='ssh_scrape_sentiment',  # Set SSH connection timeout to 1 hour
+    retries=5,
+    retry_delay=timedelta(minutes=10),
+    sla=timedelta(minutes=30),  # Example SLA of 30 minutes
+    on_failure_callback=task_failure_alert,
+    on_success_callback=None,
+    cmd_timeout = 3600*60,
     dag=dag,
 )
 
 # Set task dependencies (if any)
-# In this case, there's only one task
+start >> scrap_finshots >> scrap_yourstory >> end  # Set the task to run
