@@ -5,7 +5,7 @@ set -e
 
 # Define constants
 AIRFLOW_HOME="./run/airflow"
-DAGS_DIR="./run/doing-it.git/code/airflow/dags"
+DAGS_DIR="./code/airflow/dags"
 SSH_DIR="./airflow/.ssh"
 SPARK_SSH_DIR="./spark/.ssh"
 
