@@ -11,6 +11,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./code/python_project/scrape_sentiments:/app/scrape_sentiments
+      - ./code/python_project/deal_with_movies:/app/deal_with_movies
       - ./data:/app/data
     ports:
       - "8000:8000"
@@ -62,7 +63,8 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
-      - ./run/doing-it.git/code/airflow:/opt/airflow
+      - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
+      - ./run/airflow:/opt/airflow
       - ./airflow/.ssh:/home/airflow/.ssh:ro
     depends_on:
       - postgres
@@ -79,7 +81,8 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     volumes:
-      - ./run/doing-it.git/code/airflow:/opt/airflow
+      - ./run/doing-it.git/code/airflow/dags:/opt/airflow/dags
+      - ./run/airflow:/opt/airflow
       - ./airflow/.ssh:/home/airflow/.ssh:ro
     depends_on:
       - postgres
