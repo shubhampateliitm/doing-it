@@ -55,6 +55,7 @@ scrap_finshots = SSHOperator(
     on_success_callback=None,
     cmd_timeout = 3600*60,
     dag=dag,
+    get_pty=True,  # Use pseudo-terminal for SSH command execution
 )
 
 
@@ -69,6 +70,7 @@ scrap_yourstory = SSHOperator(
     on_success_callback=None,
     cmd_timeout = 3600*60,
     dag=dag,
+    get_pty=True,
 )
 
 # Set task dependencies (if any)

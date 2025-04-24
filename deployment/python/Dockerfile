@@ -55,8 +55,7 @@ WORKDIR /app/scrape_sentiments
 
 USER root
 
-RUN echo "Match User spark" >> /etc/ssh/sshd_config && \
-    echo "  ForceCommand /bin/bash -l" >> /etc/ssh/sshd_config
+RUN echo "AcceptEnv *" >> /etc/ssh/sshd_config
     
 # Start SSH service
 CMD ["/usr/sbin/sshd", "-D"]
